@@ -10,7 +10,8 @@ It is based on the convenient APIs from Daniel Pederson's [SKQueue](https://gith
 
 ### Swift Package Manager
 To add SFSMonitor to your Xcode project, simply add a Swift Package with the address 
-```https://github.com/ClassicalDude/SFSMonitor.git
+```swift
+https://github.com/ClassicalDude/SFSMonitor.git
 ```
 
 ## Usage
