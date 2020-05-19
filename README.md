@@ -1,41 +1,46 @@
-# SKQueue
-SKQueue is a Swift libary used to monitor changes to the filesystem.
-It wraps the part of the kernel event notification interface of libc, [kqueue](https://en.wikipedia.org/wiki/Kqueue).
-This means SKQueue has a very small footprint and is highly scalable, just like kqueue.
+# SFSMonitor
+Swift File System Monitor is a Swift 5 library used to monitor changes to the filesystem.
+It is based on the convenient APIs from Daniel Pederson's [SKQueue](https://github.com/daniel-pedersen/SKQueue) but replaces kevent with Dispatch Source as the means for monitoring changes. The mechanism is similar to Apple's own Directory Monitor (reference to which can be found [here](https://stackoverflow.com/a/61035069/10327858)), but SFSMonitor gives a complete API for maintaining a whole queue of watched files and folders.
 
 ## Requirements
+* Swift 5
 * Swift tools version 4
-
-To build in older environments just replace `Package.swift` with [this file](https://github.com/daniel-pedersen/SKQueue/blob/v1.1.0/Package.swift).
 
 ## Installation
 
 ### Swift Package Manager
-To use SKQueue, add the code below to your `dependencies` in `Package.swift`.
-Then run `swift package fetch` to fetch SKQueue.
-```swift
-.package(url: "https://github.com/daniel-pedersen/SKQueue.git", from: "1.2.0"),
+To add SFSMonitor to your Xcode project, simply add a Swift Package with the address 
+```https://github.com/ClassicalDude/SFSMonitor.git
 ```
 
 ## Usage
-To monitor the filesystem with `SKQueue`, you first need a `SKQueueDelegate` instance that can accept notifications.
-Paths to watch can then be added with `addPath`, as per the example below.
+To monitor the filesystem with `SFSMonitor`, you first need a `SFSMonitorDelegate` instance that can accept notifications.
+URLs to watch can then be added with `addUrl`, as per the example below.
+
+Note: iOS, iPadOS and MacOS all have a limit on how many files can be opened simultaneously, even just for the purpose of monitoring. That number includes all files used by your app, and as of iOS and iPadOS 13, and MacOS Catalina, it is set to 256 files. SFSMonitor has a limit set at 224 files, which can be changed by changing SFSMonitor.maxMonitored.
+
+The code is well documented - please go through it for more details and methods.
 
 ### Example
 ```swift
-import SKQueue
+import SFSMonitor
 
-class SomeClass: SKQueueDelegate {
-  func receivedNotification(_ notification: SKQueueNotification, path: String, queue: SKQueue) {
-    print("\(notification.toStrings().map { $0.rawValue }) @ \(path)")
+class SomeClass: SFSMonitorDelegate {
+  func receivedNotification(_ notification: SFSMonitorNotification, url: URL, queue: SFSMonitor) {
+  print("\(notification.toStrings().map { $0.rawValue }) @ \(url.path)")
   }
 }
 
 let delegate = SomeClass()
-let queue = SKQueue(delegate: delegate)!
+let queue = SFSMonitor(delegate: delegate)
+SFSMonitor.maxMonitored = 200
 
-queue.addPath("/Users/steve/Documents")
-queue.addPath("/Users/steve/Documents/dog.jpg")
+_ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents"))
+let test = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents"))
+if test == 1 {
+  print("The URL has already been added to the queue")
+}
+_ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents/dog.jpg"))
 ```
 |                       Action                        |                         Sample output                         |
 |:---------------------------------------------------:|:-------------------------------------------------------------:|

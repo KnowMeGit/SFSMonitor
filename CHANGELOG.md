@@ -3,6 +3,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2020-05-19
+### Changed
+- SFSMonitor was forked from https://github.com/daniel-pedersen/SKQueue
+- Updated from kevents to Dispatch Source by using Apple's Directory Monitor
+- See https://stackoverflow.com/a/61035069/10327858
+- Added static variables to help keep the number of file descriptors under the OS maximum
+- Additional functions and callbacks
+- Paths changes to URLs
+- Updated README
+
 ## [1.2.0] - 2018-09-27
 ### Added
 - Swift 4 support.

@@ -3,12 +3,12 @@
 import PackageDescription
 
 let package = Package(
-  name: "SKQueue",
+  name: "SFSMonitor",
   products: [
-    .library(name: "SKQueue", targets: ["SKQueue"])
+    .library(name: "SFSMonitor", targets: ["SFSMonitor"])
   ],
   dependencies: [],
   targets: [
-    .target(name: "SKQueue", path: ".", sources: ["SKQueue.swift"])
+    .target(name: "SFSMonitor", path: ".", sources: ["SFSMonitor.swift"])
   ]
 )
