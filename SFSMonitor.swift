@@ -109,7 +109,8 @@ public class SFSMonitor {
         let SFSMonitorQueue =  DispatchQueue(label: "sfsmonitor", attributes: .concurrent)
         
         // Open the file or directory referenced by URL for monitoring only.
-        let fileDescriptor = open((url as NSURL).fileSystemRepresentation, O_EVTONLY)
+        let fileDescriptor = open(FileManager.default.fileSystemRepresentation(withPath: url.path), O_EVTONLY)
+        guard fileDescriptor >= 0 else { return 3 }
         
         // Define a dispatch source monitoring the file or directory for additions, deletions, and renamings.
         if let SFSMonitorSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: DispatchSource.FileSystemEvent.all, queue: SFSMonitorQueue) as? DispatchSource {
