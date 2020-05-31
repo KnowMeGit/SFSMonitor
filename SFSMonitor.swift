@@ -66,14 +66,11 @@ public struct SFSMonitorNotification: OptionSet {
 
 public class SFSMonitor {
     // MARK: Properties
-    /// The maximal number of file descriptors allowed to be opened. On iOS and iPadOS it is recommended to be kept under 224 (allowing 32 more for the app).
-    public static var maxMonitored : Int = 223
+    /// The maximal number of file descriptors allowed to be opened. On iOS and iPadOS it is recommended to be kept at 224 or under (allowing 32 more for the app).
+    public static var maxMonitored : Int = 224
     
-    /// A counter of the items added to the SFSMonitor queue throughout all instances of SFSMonitor. Cannot exceed maxMonitored.
-    private static var globalCounter : Int = -1
-    
-    /// A dictionary of SFSMonitor watched URLs and their Dispatch Sources.
-    private var watchedUrls : [URL : DispatchSource] = [:]
+    // A dictionary of SFSMonitor watched URLs and their Dispatch Sources for all class instances.
+    private static var watchedURLs : [URL : DispatchSource] = [:]
     
     public var delegate: SFSMonitorDelegate?
 
@@ -81,109 +78,107 @@ public class SFSMonitor {
     public init?(delegate: SFSMonitorDelegate? = nil) {
         self.delegate = delegate
     }
-
-    deinit {
-        removeAllURLs()
-    }
+    
+    // Note: if deinit is used to release the resources, they will be released unexpectedly. You have to call removeAllURLs() manually to do that.
     
     // MARK: Add URL to the queue
     /// Add a URL to the queue of files and folders monitored by SFSMonitor. Return values: 0 for success, 1 if the URL is already monitored, 2 if maximum number of monitored files and directories is reached, 3 for general error.
     public func addURL(_ url: URL, notifyingAbout notification: SFSMonitorNotification = SFSMonitorNotification.Default) -> Int {
         
+        // Check if the URL is not empty or inaccessible
+        do {
+            if !(try url.checkResourceIsReachable()) {
+                print ("SFSMonitor error: added URL is inaccessible: \(url)")
+                return 3
+            }
+        } catch {
+            print ("SFSMonitor error: added URL is inaccessible: \(url)")
+            return 3
+        }
+        
         // Check if this URL is not already present
-        if watchedUrls.keys.contains(url) {
-            //print ("SFSMonitor error: trying to add a monitored URL to queue: \(url)")
+        if SFSMonitor.watchedURLs.keys.contains(url) {
+            print ("SFSMonitor error: trying to add an already monitored URL to queue: \(url)")
             return 1
         }
         
         // Check if the number of open file descriptors exceeds the limit
-        if SFSMonitor.globalCounter > SFSMonitor.maxMonitored {
-            //print ("SFSMonitor error: number of allowed file descriptors exceeded")
+        if SFSMonitor.watchedURLs.count >= SFSMonitor.maxMonitored {
+            print ("SFSMonitor error: number of allowed file descriptors exceeded")
             return 2
         }
-        
-        // Increment the global counter
-        SFSMonitor.globalCounter += 1
         
         // Define the DispatchQueue
         let SFSMonitorQueue =  DispatchQueue(label: "sfsmonitor", attributes: .concurrent)
         
         // Open the file or directory referenced by URL for monitoring only.
         let fileDescriptor = open(FileManager.default.fileSystemRepresentation(withPath: url.path), O_EVTONLY)
-        guard fileDescriptor >= 0 else { return 3 }
+        guard fileDescriptor >= 0 else {
+            print ("SFSMonitor error: could not create a file descriptor for URL: \(url)")
+            return 3
+        }
         
         // Define a dispatch source monitoring the file or directory for additions, deletions, and renamings.
         if let SFSMonitorSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: DispatchSource.FileSystemEvent.all, queue: SFSMonitorQueue) as? DispatchSource {
             
             // Define the block to call when a file change is detected.
             SFSMonitorSource.setEventHandler {
+                
                 // Call out to the `SFSMonitorDelegate` so that it can react appropriately to the change.
                 let event = SFSMonitorSource.data as DispatchSource.FileSystemEvent
                 let notification = SFSMonitorNotification(rawValue: UInt32(event.rawValue))
                 self.delegate?.receivedNotification(notification, url: url, queue: self)
-                //print ("SFSMonitor notification: \(notification.toStrings())")
-                //print ("Number of file descriptors open: \(SFSMonitor.globalCounter)")
             }
         
             // Define a cancel handler to ensure the directory is closed when the source is cancelled.
             SFSMonitorSource.setCancelHandler {
                 close(fileDescriptor)
-                self.watchedUrls.removeValue(forKey: url)
-                
-                // Reduce global counter
-                SFSMonitor.globalCounter -= 1
-                //print ("SFSMonitor stopped watching the URL \(url)")
-                //print ("Number of file descriptors open: \(SFSMonitor.globalCounter)")
+                SFSMonitor.watchedURLs.removeValue(forKey: url)
             }
             
             // Start monitoring
             SFSMonitorSource.resume()
         
             // Populate our watched URL array
-            watchedUrls[url] = SFSMonitorSource
+            SFSMonitor.watchedURLs[url] = SFSMonitorSource
             
-        } else { return 3 } // Something went wrong
+        } else {
+            print ("SFSMonitor error: could not create a Dispatch Source for URL: \(url)")
+            return 3
+        }
         
         return 0
         
     }
 
-    /// A boolean value that indicates if the entered URL is already being monitored by SFSMonitor.
+    /// A boolean value that indicates whether the entered URL is already being monitored by SFSMonitor.
     public func isURLWatched(_ url: URL) -> Bool {
-        return watchedUrls.keys.contains(url)
+        return SFSMonitor.watchedURLs.keys.contains(url)
     }
 
-    /// Remove the entered URL from the SFSMonitor queue and close its file reference.
+    /// Remove URL from the SFSMonitor queue and close its file reference.
     public func removeURL(_ url: URL) {
-        if let SFSMonitorSource = watchedUrls[url] {
+        if let SFSMonitorSource = SFSMonitor.watchedURLs[url] {
             
             // Cancel dispatch source and remove it from list
             SFSMonitorSource.cancel()
         }
     }
 
-    /// Reset the SFSMonitor queue for this instance of the class.
+    /// Reset the SFSMonitor queue.
     public func removeAllURLs() {
-        watchedUrls.forEach { watchedUrl in
+        for watchedUrl in SFSMonitor.watchedURLs {
             watchedUrl.value.cancel()
         }
-        watchedUrls = [:]
     }
 
-    /// The number of URLs being watched by this instance of SMSMonitor.
-    public func numberOfWatchedURLsForQueue() -> Int {
-        return watchedUrls.count
+    /// The number of URLs being watched by SFSMonitor.
+    public func numberOfWatchedURLs() -> Int {
+        return SFSMonitor.watchedURLs.count
     }
     
-    /// The number of URLs being watched by all instances of SMSMonitor.
-    public func globalNumberOfWatchedUrls() -> Int {
-        return SFSMonitor.globalCounter+1
-    }
-    
-    /// An array of all URLs being watched by this instance of SMSMonitor.
+    /// An array of all URLs being watched by SFSMonitor.
     public func URLsWatched() -> [URL] {
-        return Array(watchedUrls.keys)
+        return Array(SFSMonitor.watchedURLs.keys)
     }
 }
-
-

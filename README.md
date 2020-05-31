@@ -17,6 +17,8 @@ https://github.com/ClassicalDude/SFSMonitor.git
 ## Usage
 To monitor the filesystem with `SFSMonitor`, you first need a `SFSMonitorDelegate` instance that can accept notifications.
 
+The class behaves as a singleton class. Since it manages limited OS resources, all class instances will refer to the same static constants, variables and dictionaries.
+
 URLs to watch can then be added with `addUrl`, as per the example below. The `addUrl` method returns an integer value: 0 for success, 1 if the URL is already monitored, 2 if maximum number of monitored files and directories is reached, 3 for general error.
 
 Note: iOS, iPadOS and MacOS all have a limit on how many files and directories can be opened simultaneously, even just for the purpose of monitoring. That number includes all files used by your app, and as of iOS and iPadOS 13, and MacOS Catalina, it is set to 256 files. For more details, please read [here](https://wilsonmar.github.io/maximum-limits/).
