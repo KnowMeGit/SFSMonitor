@@ -66,8 +66,8 @@ public struct SFSMonitorNotification: OptionSet {
 
 public class SFSMonitor {
     // MARK: Properties
-    /// The maximal number of file descriptors allowed to be opened. On iOS and iPadOS it is recommended to be kept at 224 or under (allowing 32 more for the app).
-    public static var maxMonitored : Int = 224
+    // The maximal number of file descriptors allowed to be opened. On iOS and iPadOS it is recommended to be kept at 224 or under (allowing 32 more for the app).
+    private static var maxMonitored : Int = 224
     
     // A dictionary of SFSMonitor watched URLs and their Dispatch Sources for all class instances.
     private static var watchedURLs : [URL : DispatchSource] = [:]
@@ -180,5 +180,15 @@ public class SFSMonitor {
     /// An array of all URLs being watched by SFSMonitor.
     public func URLsWatched() -> [URL] {
         return Array(SFSMonitor.watchedURLs.keys)
+    }
+    
+    /// Set the maximal number of file descriptors allowed to be opened. On iOS and iPadOS it is recommended to be kept at 224 or under (allowing 32 more for the app).
+    public func setMaxMonitored(number: Int) {
+        SFSMonitor.maxMonitored = number
+    }
+    
+    /// Get the current maximal number of file descriptors allowed to be opened.
+    public func getMaxMonitored() -> Int {
+        return SFSMonitor.maxMonitored
     }
 }
