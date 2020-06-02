@@ -26,14 +26,18 @@ Since it manages limited OS resources, all class instances will refer to the sam
 
 The code is well documented - please go through it for more details and methods.
 
-### Example
+### Examples
 ```swift
 import SFSMonitor
 
 class SomeClass: SFSMonitorDelegate {
+    
+    let monitorDispatchQueue =  DispatchQueue(label: "monitorDispatchQueue", qos: .utility)
+    
     func receivedNotification(_ notification: SFSMonitorNotification, url: URL, queue: SFSMonitor) {
+    
         // Place actions into a utility-level Dispatch Queue. Remember to call UI updates from DispatchQueue.main.async blocks.
-        let monitorDispatchQueue =  DispatchQueue(label: "monitorDispatchQueue", qos: .utility)
+        
         monitorDispatchQueue.async(flags: .barrier) { // Multithread protection
             print("\(notification.toStrings().map { $0.rawValue }) @ \(url.path)")
         }
@@ -56,6 +60,27 @@ _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents/dog.jpg"))
 |   Add or remove file in `/Users/steve/Documents`    |             `["Write"] @ /Users/steve/Documents`              |
 | Add or remove directory in `/Users/steve/Documents` |     `["Write", "SizeIncrease"] @ /Users/steve/Documents`      |
 |   Write to file `/Users/steve/Documents/dog.jpg`    | `["Rename", "SizeIncrease"] @ /Users/steve/Documents/dog.jpg` |
+
+
+Important: when you call the removeAllURLs() function, it is performed asynchronously. Therefore, you must make sure it completes before adding new paths to watch. You can do so with a timer:
+```swift
+let delegate = SomeClass()
+let queue = SFSMonitor(delegate: delegate)
+
+// Reset the queue
+queue?.removeAllURLs()
+
+// Re-add all paths with a timer block, to make sure the queue reset has completed.
+Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { (timer) in
+
+    if self.queue?.numberOfWatchedURLs() == 0 {
+        timer.invalidate()
+        
+        _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents"))
+    }
+}
+```
+
 
 ## Contributing
 

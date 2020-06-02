@@ -72,6 +72,9 @@ public class SFSMonitor {
     // A dictionary of SFSMonitor watched URLs and their Dispatch Sources for all class instances.
     private static var watchedURLs : [URL : DispatchSource] = [:]
     
+    // Define the DispatchQueue
+    private let SFSMonitorQueue =  DispatchQueue(label: "sfsmonitor", attributes: .concurrent)
+    
     public var delegate: SFSMonitorDelegate?
 
     // MARK: Initializers
@@ -107,9 +110,6 @@ public class SFSMonitor {
             print ("SFSMonitor error: number of allowed file descriptors exceeded")
             return 2
         }
-        
-        // Define the DispatchQueue
-        let SFSMonitorQueue =  DispatchQueue(label: "sfsmonitor", attributes: .concurrent)
         
         // Open the file or directory referenced by URL for monitoring only.
         let fileDescriptor = open(FileManager.default.fileSystemRepresentation(withPath: url.path), O_EVTONLY)
