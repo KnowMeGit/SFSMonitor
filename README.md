@@ -36,8 +36,8 @@ class SomeClass: SFSMonitorDelegate {
     
     func receivedNotification(_ notification: SFSMonitorNotification, url: URL, queue: SFSMonitor) {
     
-        // Place actions into a utility-level Dispatch Queue. Remember to call UI updates from DispatchQueue.main.async blocks.
-        
+        // Place actions into a utility-level Dispatch Queue.
+        // Remember to call UI updates from DispatchQueue.main.async blocks.
         monitorDispatchQueue.async(flags: .barrier) { // Multithread protection
             print("\(notification.toStrings().map { $0.rawValue }) @ \(url.path)")
         }
