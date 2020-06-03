@@ -55,10 +55,10 @@ if test == 1 {
 }
 _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents/dog.jpg"))
 ```
-|                       Action                        |                         Sample output                         |
+|                       Action                        |                         Sample Output                         |
 |:---------------------------------------------------:|:-------------------------------------------------------------:|
 |   Add or remove file in `/Users/steve/Documents`    |             `["Write"] @ /Users/steve/Documents`              |
-| Add or remove directory in `/Users/steve/Documents` |     `["Write", "SizeIncrease"] @ /Users/steve/Documents`      |
+| Add or remove directory in `/Users/steve/Documents` |     `["Write", "LinkCountChange"] @ /Users/steve/Documents`      |
 |   Write to file `/Users/steve/Documents/dog.jpg`    | `["Rename", "SizeIncrease"] @ /Users/steve/Documents/dog.jpg` |
 
 
@@ -70,13 +70,15 @@ let queue = SFSMonitor(delegate: delegate)
 // Reset the queue
 queue?.removeAllURLs()
 
-// Re-add all paths with a timer block, to make sure the queue reset has completed.
+// Add paths with a timer block, to make sure the queue reset has completed.
 Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { (timer) in
 
     if self.queue?.numberOfWatchedURLs() == 0 {
         timer.invalidate()
         
+        // Add paths here
         _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents"))
+        // ...
     }
 }
 ```
