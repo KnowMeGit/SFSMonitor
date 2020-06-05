@@ -62,7 +62,7 @@ _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents/dog.jpg"))
 |   Write to file `/Users/steve/Documents/dog.jpg`    | `["Rename", "SizeIncrease"] @ /Users/steve/Documents/dog.jpg` |
 
 
-Important: when you call the removeAllURLs() function, it is performed asynchronously. Therefore, you must make sure it completes before adding new paths to watch. You can do so with a timer:
+Important: when you call the removeAllURLs() function, it is performed asynchronously. Therefore, you must make sure it completes before adding new paths to watch. You can do so with a timer, as long as you make sure you set the main thread for the timer. If you wish for the timer thread to be a background thread, follow [this tutorial](https://medium.com/over-engineering/a-background-repeating-timer-in-swift-412cecfd2ef9).
 ```swift
 let delegate = SomeClass()
 let queue = SFSMonitor(delegate: delegate)
@@ -71,14 +71,16 @@ let queue = SFSMonitor(delegate: delegate)
 queue?.removeAllURLs()
 
 // Add paths with a timer block, to make sure the queue reset has completed.
-Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { (timer) in
+DispatchQueue.main.async { 
+    Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { (timer) in
 
-    if self.queue?.numberOfWatchedURLs() == 0 {
-        timer.invalidate()
+        if self.queue?.numberOfWatchedURLs() == 0 {
+            timer.invalidate()
         
-        // Add paths here
-        _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents"))
-        // ...
+            // Add paths here
+            _ = queue.addURL(URL(fileURLWithPath: "/Users/steve/Documents"))
+            // ...
+        }
     }
 }
 ```

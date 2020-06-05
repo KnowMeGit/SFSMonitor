@@ -75,6 +75,9 @@ public class SFSMonitor {
     // Define the DispatchQueue
     private let SFSMonitorQueue =  DispatchQueue(label: "sfsmonitor", attributes: .concurrent)
     
+    // DispatchQueue for thread safety when resetting the watchedURLs array
+    private let SFSThreadSafetyQueue = DispatchQueue(label: "sfsthreadqueue", qos: .utility)
+    
     public var delegate: SFSMonitorDelegate?
 
     // MARK: Initializers
@@ -133,7 +136,9 @@ public class SFSMonitor {
             // Define a cancel handler to ensure the directory is closed when the source is cancelled.
             SFSMonitorSource.setCancelHandler {
                 close(fileDescriptor)
-                SFSMonitor.watchedURLs.removeValue(forKey: url)
+                self.SFSThreadSafetyQueue.async(flags: .barrier) {
+                    SFSMonitor.watchedURLs.removeValue(forKey: url)
+                }
             }
             
             // Start monitoring
@@ -141,6 +146,7 @@ public class SFSMonitor {
         
             // Populate our watched URL array
             SFSMonitor.watchedURLs[url] = SFSMonitorSource
+        
             
         } else {
             print ("SFSMonitor error: could not create a Dispatch Source for URL: \(url)")
