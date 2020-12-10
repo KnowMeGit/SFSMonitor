@@ -1,6 +1,6 @@
 # SFSMonitor
 Swift File System Monitor is a Swift 5 library used to monitor changes to the filesystem.
-It is based on the convenient APIs from Daniel Pederson's [SKQueue](https://github.com/daniel-pedersen/SKQueue) but replaces kevent with Dispatch Source as the means for monitoring changes. The mechanism is similar to Apple's own Directory Monitor (reference to which can be found [here](https://stackoverflow.com/a/61035069/10327858)), but SFSMonitor gives a complete API for maintaining a whole queue of watched files and folders.
+It is based on the convenient APIs from Daniel Pedersen's [SKQueue](https://github.com/daniel-pedersen/SKQueue) but replaces kevent with Dispatch Source as the means for monitoring changes. The mechanism is similar to Apple's own Directory Monitor (reference to which can be found [here](https://stackoverflow.com/a/61035069/10327858)), but SFSMonitor gives a complete API for maintaining a whole queue of watched files and folders.
 
 ## Requirements
 * Swift 5
