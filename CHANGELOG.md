@@ -5,7 +5,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [1.3.2] - 2021-08-30
 ### Added
-- Thread protection when adding an entry to the watched URLs array
+- Thread protection to the watched URLs array in all relevant methods
 
 ## [1.3.0] - 2020-05-19
 ### Changed

@@ -91,6 +91,9 @@ public class SFSMonitor {
     /// Add a URL to the queue of files and folders monitored by SFSMonitor. Return values: 0 for success, 1 if the URL is already monitored, 2 if maximum number of monitored files and directories is reached, 3 for general error.
     public func addURL(_ url: URL, notifyingAbout notification: SFSMonitorNotification = SFSMonitorNotification.Default) -> Int {
         
+        // Dispatch Semaphore for coordinating access to the watched URLs array
+        let watchedURLsSemaphore = DispatchSemaphore(value: 0)
+        
         // Check if the URL is not empty or inaccessible
         do {
             if !(try url.checkResourceIsReachable()) {
@@ -102,16 +105,50 @@ public class SFSMonitor {
             return 3
         }
         
-        // Check if this URL is not already present
-        if SFSMonitor.watchedURLs.keys.contains(url) {
-            print ("SFSMonitor error: trying to add an already monitored URL to queue: \(url)")
-            return 1
+        // The next 2 tests have to read the watchedURLs array. To make this thread-safe,
+        // this must be done from our thread-safety dispatch queue.
+        // To be able to get the return values from the queue, we will use an internal
+        // function with a completion handler. The Dispatch Semaphore will ensure
+        // that we do not move on before these tests are complete.
+        
+        // Variable that records the return values of the tests
+        var initialTestsValue : Int = 0
+        // Internal function that performs the tests
+        func initialTests (returnValue: (Int) -> ()) {
+            // Make the reads thread-safe
+            self.SFSThreadSafetyQueue.sync {
+                // Check if this URL is not already present
+                if SFSMonitor.watchedURLs.keys.contains(url) {
+                    print ("SFSMonitor error: trying to add an already monitored URL to queue: \(url)")
+                    returnValue(1)
+                    watchedURLsSemaphore.signal()
+                    return
+                }
+            
+                // Check if the number of open file descriptors exceeds the limit
+                if SFSMonitor.watchedURLs.count >= SFSMonitor.maxMonitored {
+                    print ("SFSMonitor error: number of allowed file descriptors exceeded")
+                    returnValue(2)
+                    watchedURLsSemaphore.signal()
+                    return
+                }
+                
+                // If we got here, the return value is 0
+                returnValue(0)
+                watchedURLsSemaphore.signal()
+            }
         }
         
-        // Check if the number of open file descriptors exceeds the limit
-        if SFSMonitor.watchedURLs.count >= SFSMonitor.maxMonitored {
-            print ("SFSMonitor error: number of allowed file descriptors exceeded")
-            return 2
+        // Call the internal function to perform the tests
+        initialTests { returnValue in
+            initialTestsValue = returnValue
+        }
+        // Wait until we get the results back
+        watchedURLsSemaphore.wait()
+        
+        // With anything other than 0, return the value
+        if initialTestsValue != 0 {
+            return initialTestsValue
         }
         
         // Open the file or directory referenced by URL for monitoring only.
@@ -144,12 +181,11 @@ public class SFSMonitor {
             // Start monitoring
             SFSMonitorSource.resume()
         
-            // Populate our watched URL array
+            // Populate our watched URL array within the thread-safe queue
             self.SFSThreadSafetyQueue.async(flags: .barrier) {
                 SFSMonitor.watchedURLs[url] = SFSMonitorSource
             }
         
-            
         } else {
             print ("SFSMonitor error: could not create a Dispatch Source for URL: \(url)")
             return 3
@@ -161,33 +197,79 @@ public class SFSMonitor {
 
     /// A boolean value that indicates whether the entered URL is already being monitored by SFSMonitor.
     public func isURLWatched(_ url: URL) -> Bool {
-        return SFSMonitor.watchedURLs.keys.contains(url)
+        // This query has to be done through an internal function with a completion handler
+        // (with the help of a semaphore) so that we can use the dispatch queue for thread protection
+        let isURLWatchedSemaphore = DispatchSemaphore(value: 0)
+        func isURLWatchedInternalFunction(completion: (Bool) -> ()) {
+            self.SFSThreadSafetyQueue.sync {
+                completion(SFSMonitor.watchedURLs.keys.contains(url))
+                isURLWatchedSemaphore.signal()
+            }
+        }
+        var returnValue = false
+        isURLWatchedInternalFunction {completion in
+            returnValue = completion
+        }
+        isURLWatchedSemaphore.wait()
+        return returnValue
     }
 
     /// Remove URL from the SFSMonitor queue and close its file reference.
     public func removeURL(_ url: URL) {
-        if let SFSMonitorSource = SFSMonitor.watchedURLs[url] {
-            
-            // Cancel dispatch source and remove it from list
-            SFSMonitorSource.cancel()
+        SFSThreadSafetyQueue.sync {
+            if let SFSMonitorSource = SFSMonitor.watchedURLs[url] {
+                
+                // Cancel dispatch source and remove it from list
+                SFSMonitorSource.cancel()
+            }
         }
     }
 
     /// Reset the SFSMonitor queue.
     public func removeAllURLs() {
-        for watchedUrl in SFSMonitor.watchedURLs {
-            watchedUrl.value.cancel()
+        SFSThreadSafetyQueue.sync {
+            for watchedUrl in SFSMonitor.watchedURLs {
+                watchedUrl.value.cancel()
+            }
         }
     }
 
     /// The number of URLs being watched by SFSMonitor.
     public func numberOfWatchedURLs() -> Int {
-        return SFSMonitor.watchedURLs.count
+        // This query has to be done through an internal function with a completion handler
+        // (with the help of a semaphore) so that we can use the dispatch queue for thread protection
+        let numberOfWatchedURLsSemaphore = DispatchSemaphore(value: 0)
+        func numberOfWatchedURLsInternal(completion: (Int) -> ()) {
+            self.SFSThreadSafetyQueue.sync {
+                completion(SFSMonitor.watchedURLs.count)
+                numberOfWatchedURLsSemaphore.signal()
+            }
+        }
+        var returnValue : Int = 0
+        numberOfWatchedURLsInternal { completion in
+            returnValue = completion
+        }
+        numberOfWatchedURLsSemaphore.wait()
+        return returnValue
     }
     
     /// An array of all URLs being watched by SFSMonitor.
     public func URLsWatched() -> [URL] {
-        return Array(SFSMonitor.watchedURLs.keys)
+        // This query has to be done through an internal function with a completion handler
+        // (with the help of a semaphore) so that we can use the dispatch queue for thread protection
+        let URLsWatchedSemaphore = DispatchSemaphore(value: 0)
+        func URLsWatchedInternal(completion: ([URL]) -> ()) {
+            self.SFSThreadSafetyQueue.sync {
+                completion(Array(SFSMonitor.watchedURLs.keys))
+                URLsWatchedSemaphore.signal()
+            }
+        }
+        var returnValue : [URL] = []
+        URLsWatchedInternal { completion in
+            returnValue = completion
+        }
+        URLsWatchedSemaphore.wait()
+        return returnValue
     }
     
     /// Set the maximal number of file descriptors allowed to be opened. On iOS and iPadOS it is recommended to be kept at 224 or under (allowing 32 more for the app).
