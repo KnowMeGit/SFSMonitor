@@ -75,7 +75,7 @@ public class SFSMonitor {
     // Define the DispatchQueue
     private let SFSMonitorQueue =  DispatchQueue(label: "sfsmonitor", attributes: .concurrent)
     
-    // DispatchQueue for thread safety when resetting the watchedURLs array
+    // DispatchQueue for thread safety when modifying the watchedURLs array
     private let SFSThreadSafetyQueue = DispatchQueue(label: "sfsthreadqueue", qos: .utility)
     
     public var delegate: SFSMonitorDelegate?
@@ -145,7 +145,9 @@ public class SFSMonitor {
             SFSMonitorSource.resume()
         
             // Populate our watched URL array
-            SFSMonitor.watchedURLs[url] = SFSMonitorSource
+            self.SFSThreadSafetyQueue.async(flags: .barrier) {
+                SFSMonitor.watchedURLs[url] = SFSMonitorSource
+            }
         
             
         } else {

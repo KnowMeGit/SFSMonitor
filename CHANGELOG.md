@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2021-08-30
+### Added
+- Thread protection when adding an entry to the watched URLs array
+
 ## [1.3.0] - 2020-05-19
 ### Changed
 - SFSMonitor was forked from https://github.com/daniel-pedersen/SKQueue
