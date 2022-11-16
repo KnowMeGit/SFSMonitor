@@ -66,27 +66,13 @@ public class SFSMonitor {
                 guard
                     SFSMonitor.watchedURLs.keys.contains(url) == false
                 else { throw SFSMonitorError.urlAlreadyMonitored }
-                //                if SFSMonitor.watchedURLs.keys.contains(url) {
-                //                    print ("SFSMonitor error: trying to add an already monitored URL to queue: \(url)")
-                ////                    returnValue(1)
-                //                    watchedURLsSemaphore.signal()
-                //                    return
-                //                }
 
                 // Check if the number of open file descriptors exceeds the limit
                 guard
                     SFSMonitor.watchedURLs.count < SFSMonitor.maxMonitored
                 else { throw SFSMonitorError.maximumMonitoredURLsReached }
-                //                if SFSMonitor.watchedURLs.count >= SFSMonitor.maxMonitored {
-                //                    print ("SFSMonitor error: number of allowed file descriptors exceeded")
-                ////                    returnValue(2)
-                //                    watchedURLsSemaphore.signal()
-                //                    return
-                //                }
-                
-                // If we got here, the return value is 0
-                //                returnValue(0)
-                //                watchedURLsSemaphore.signal()
+
+                // If we got here, there was no error to throw
             }
         }
         
