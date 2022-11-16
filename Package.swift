@@ -9,6 +9,6 @@ let package = Package(
   ],
   dependencies: [],
   targets: [
-    .target(name: "SFSMonitor", path: ".", sources: ["SFSMonitor.swift"])
+    .target(name: "SFSMonitor")
   ]
 )
