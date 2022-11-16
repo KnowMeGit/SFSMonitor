@@ -39,21 +39,15 @@ public class SFSMonitor {
     
     // MARK: Add URL to the queue
     /// Add a URL to the queue of files and folders monitored by SFSMonitor. Return values: 0 for success, 1 if the URL is already monitored, 2 if maximum number of monitored files and directories is reached, 3 for general error.
-    public func addURL(_ url: URL, notifyingAbout notification: SFSMonitorNotification = SFSMonitorNotification.Default) -> Int {
+    public func addURL(_ url: URL, notifyingAbout notification: SFSMonitorNotification = SFSMonitorNotification.Default) throws {
         
         // Dispatch Semaphore for coordinating access to the watched URLs array
         let watchedURLsSemaphore = DispatchSemaphore(value: 0)
         
         // Check if the URL is not empty or inaccessible
-        do {
-            if !(try url.checkResourceIsReachable()) {
-                print ("SFSMonitor error: added URL is inaccessible: \(url)")
-                return 3
-            }
-        } catch {
-            print ("SFSMonitor error: added URL is inaccessible: \(url)")
-            return 3
-        }
+        guard
+            (try? url.checkResourceIsReachable()) == true
+        else { throw SFSMonitorError.urlInaccessible }
         
         // The next 2 tests have to read the watchedURLs array. To make this thread-safe,
         // this must be done from our thread-safety dispatch queue.
@@ -62,50 +56,55 @@ public class SFSMonitor {
         // that we do not move on before these tests are complete.
         
         // Variable that records the return values of the tests
-        var initialTestsValue : Int = 0
+        //        var initialTestsValue : Int = 0
         // Internal function that performs the tests
-        func initialTests (returnValue: (Int) -> ()) {
+        func initialTests() throws {
             // Make the reads thread-safe
-            self.SFSThreadSafetyQueue.sync {
+            defer { watchedURLsSemaphore.signal() }
+            try self.SFSThreadSafetyQueue.sync {
                 // Check if this URL is not already present
-                if SFSMonitor.watchedURLs.keys.contains(url) {
-                    print ("SFSMonitor error: trying to add an already monitored URL to queue: \(url)")
-                    returnValue(1)
-                    watchedURLsSemaphore.signal()
-                    return
-                }
-            
+                guard
+                    SFSMonitor.watchedURLs.keys.contains(url) == false
+                else { throw SFSMonitorError.urlAlreadyMonitored }
+                //                if SFSMonitor.watchedURLs.keys.contains(url) {
+                //                    print ("SFSMonitor error: trying to add an already monitored URL to queue: \(url)")
+                ////                    returnValue(1)
+                //                    watchedURLsSemaphore.signal()
+                //                    return
+                //                }
+
                 // Check if the number of open file descriptors exceeds the limit
-                if SFSMonitor.watchedURLs.count >= SFSMonitor.maxMonitored {
-                    print ("SFSMonitor error: number of allowed file descriptors exceeded")
-                    returnValue(2)
-                    watchedURLsSemaphore.signal()
-                    return
-                }
+                guard
+                    SFSMonitor.watchedURLs.count < SFSMonitor.maxMonitored
+                else { throw SFSMonitorError.maximumMonitoredURLsReached }
+                //                if SFSMonitor.watchedURLs.count >= SFSMonitor.maxMonitored {
+                //                    print ("SFSMonitor error: number of allowed file descriptors exceeded")
+                ////                    returnValue(2)
+                //                    watchedURLsSemaphore.signal()
+                //                    return
+                //                }
                 
                 // If we got here, the return value is 0
-                returnValue(0)
-                watchedURLsSemaphore.signal()
+                //                returnValue(0)
+                //                watchedURLsSemaphore.signal()
             }
         }
         
         // Call the internal function to perform the tests
-        initialTests { returnValue in
-            initialTestsValue = returnValue
-        }
+        try initialTests()
         // Wait until we get the results back
         watchedURLsSemaphore.wait()
         
         // With anything other than 0, return the value
-        if initialTestsValue != 0 {
-            return initialTestsValue
-        }
+        //        if initialTestsValue != 0 {
+        //            return initialTestsValue
+        //        }
         
         // Open the file or directory referenced by URL for monitoring only.
         let fileDescriptor = open(FileManager.default.fileSystemRepresentation(withPath: url.path), O_EVTONLY)
         guard fileDescriptor >= 0 else {
             print ("SFSMonitor error: could not create a file descriptor for URL: \(url)")
-            return 3
+            throw SFSMonitorError.couldNotCreateFileDescriptor
         }
         
         // Define a dispatch source monitoring the file or directory for additions, deletions, and renamings.
@@ -119,7 +118,7 @@ public class SFSMonitor {
                 let notification = SFSMonitorNotification(rawValue: UInt32(event.rawValue))
                 self.delegate?.receivedNotification(notification, url: url, queue: self)
             }
-        
+
             // Define a cancel handler to ensure the directory is closed when the source is cancelled.
             SFSMonitorSource.setCancelHandler {
                 close(fileDescriptor)
@@ -130,19 +129,16 @@ public class SFSMonitor {
             
             // Start monitoring
             SFSMonitorSource.resume()
-        
+
             // Populate our watched URL array within the thread-safe queue
             self.SFSThreadSafetyQueue.async(flags: .barrier) {
                 SFSMonitor.watchedURLs[url] = SFSMonitorSource
             }
-        
+
         } else {
             print ("SFSMonitor error: could not create a Dispatch Source for URL: \(url)")
-            return 3
+            throw SFSMonitorError.couldNotCreateDispatchSource
         }
-        
-        return 0
-        
     }
 
     /// A boolean value that indicates whether the entered URL is already being monitored by SFSMonitor.
@@ -230,5 +226,13 @@ public class SFSMonitor {
     /// Get the current maximal number of file descriptors allowed to be opened.
     public func getMaxMonitored() -> Int {
         return SFSMonitor.maxMonitored
+    }
+
+    public enum SFSMonitorError: Error {
+        case urlAlreadyMonitored
+        case urlInaccessible
+        case maximumMonitoredURLsReached
+        case couldNotCreateFileDescriptor
+        case couldNotCreateDispatchSource
     }
 }
