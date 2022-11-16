@@ -2,13 +2,13 @@ import Foundation
 
 /// A string representation of possible changes detected by SFSMonitor.
 public enum SFSMonitorNotificationString: String {
-	case Rename
-	case Write
-	case Delete
-	case AttributeChange
-	case SizeIncrease
-	case LinkCountChange
-	case AccessRevocation
-	case Unlock
-	case DataAvailable
+	case rename = "Rename"
+	case write = "Write"
+	case delete = "Delete"
+	case attributeChange = "AttributeChange"
+	case sizeIncrease = "SizeIncrease"
+	case linkCountChange = "LinkCountChange"
+	case accessRevocation = "AccessRevocation"
+	case unlock = "Unlock"
+	case dataAvailable = "DataAvailable"
 }

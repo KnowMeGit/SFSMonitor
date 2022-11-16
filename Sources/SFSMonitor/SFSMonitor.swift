@@ -39,7 +39,7 @@ public class SFSMonitor {
     
     // MARK: Add URL to the queue
     /// Add a URL to the queue of files and folders monitored by SFSMonitor. Return values: 0 for success, 1 if the URL is already monitored, 2 if maximum number of monitored files and directories is reached, 3 for general error.
-    public func addURL(_ url: URL, notifyingAbout notification: SFSMonitorNotification = SFSMonitorNotification.Default) throws {
+    public func addURL(_ url: URL, notifyingAbout notification: SFSMonitorNotification = SFSMonitorNotification.all) throws {
         
         // Dispatch Semaphore for coordinating access to the watched URLs array
         let watchedURLsSemaphore = DispatchSemaphore(value: 0)
@@ -80,12 +80,7 @@ public class SFSMonitor {
         try initialTests()
         // Wait until we get the results back
         watchedURLsSemaphore.wait()
-        
-        // With anything other than 0, return the value
-        //        if initialTestsValue != 0 {
-        //            return initialTestsValue
-        //        }
-        
+
         // Open the file or directory referenced by URL for monitoring only.
         let fileDescriptor = open(FileManager.default.fileSystemRepresentation(withPath: url.path), O_EVTONLY)
         guard fileDescriptor >= 0 else {
@@ -94,19 +89,18 @@ public class SFSMonitor {
         }
         
         // Define a dispatch source monitoring the file or directory for additions, deletions, and renamings.
-        if let SFSMonitorSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: DispatchSource.FileSystemEvent.all, queue: SFSMonitorQueue) as? DispatchSource {
+        if let monitorSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: notification, queue: SFSMonitorQueue) as? DispatchSource {
             
             // Define the block to call when a file change is detected.
-            SFSMonitorSource.setEventHandler {
+            monitorSource.setEventHandler {
                 
                 // Call out to the `SFSMonitorDelegate` so that it can react appropriately to the change.
-                let event = SFSMonitorSource.data as DispatchSource.FileSystemEvent
-                let notification = SFSMonitorNotification(rawValue: UInt32(event.rawValue))
-                self.delegate?.receivedNotification(notification, url: url, queue: self)
+                let event = monitorSource.data as DispatchSource.FileSystemEvent
+                self.delegate?.receivedNotification(event, url: url, queue: self)
             }
 
             // Define a cancel handler to ensure the directory is closed when the source is cancelled.
-            SFSMonitorSource.setCancelHandler {
+            monitorSource.setCancelHandler {
                 close(fileDescriptor)
                 self.SFSThreadSafetyQueue.async(flags: .barrier) {
                     SFSMonitor.watchedURLs.removeValue(forKey: url)
@@ -114,11 +108,11 @@ public class SFSMonitor {
             }
             
             // Start monitoring
-            SFSMonitorSource.resume()
+            monitorSource.resume()
 
             // Populate our watched URL array within the thread-safe queue
             self.SFSThreadSafetyQueue.async(flags: .barrier) {
-                SFSMonitor.watchedURLs[url] = SFSMonitorSource
+                SFSMonitor.watchedURLs[url] = monitorSource
             }
 
         } else {
