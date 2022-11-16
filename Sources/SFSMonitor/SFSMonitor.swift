@@ -31,7 +31,7 @@ public class SFSMonitor {
     public var delegate: SFSMonitorDelegate?
 
     // MARK: Initializers
-    public init?(delegate: SFSMonitorDelegate? = nil) {
+    public init(delegate: SFSMonitorDelegate? = nil) {
         self.delegate = delegate
     }
     
