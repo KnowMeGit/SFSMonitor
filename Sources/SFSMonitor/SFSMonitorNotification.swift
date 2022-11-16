@@ -20,6 +20,6 @@ extension SFSMonitorNotification {
 
 extension SFSMonitorNotification: CustomStringConvertible {
     public var description: String {
-        toStrings().map(\.rawValue).joined(separator: ", ") + \(rawValue)
+        toStrings().map(\.rawValue).joined(separator: ", ") + "\(rawValue)"
     }
 }
